@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NGEN Explorer</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --line:#e3e6ea; --ink:#1b1f24; --mut:#6b727c;
+          --accent:#2d6cdf; --ok:#1a9d54; --warn:#d8860b; --err:#d33; color-scheme:light; }
+  @media (prefers-color-scheme:dark){ :root{ --bg:#15181c; --card:#1e2228; --line:#2c323a;
+          --ink:#e7eaee; --mut:#9aa2ad; --accent:#5a8df0; color-scheme:dark; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  button { font:inherit; cursor:pointer; }
+
+  #login { max-width:360px; margin:8vh auto; background:var(--card); border:1px solid var(--line);
+           border-radius:12px; padding:28px 24px; }
+  #login h1 { margin:0 0 4px; font-size:20px; }
+  #login p { margin:0 0 20px; color:var(--mut); font-size:13px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:14px 0 4px; }
+  input { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:7px;
+          background:var(--bg); color:var(--ink); }
+  #login button { width:100%; margin-top:20px; padding:10px; border:0; border-radius:7px;
+          background:var(--accent); color:#fff; font-weight:600; }
+  #loginErr { color:var(--err); font-size:13px; margin-top:12px; min-height:16px; }
+
+  #app { display:none; grid-template-columns:270px 1fr; height:100vh; }
+  aside { border-right:1px solid var(--line); overflow:auto; background:var(--card); }
+  aside header { padding:14px 16px; border-bottom:1px solid var(--line); position:sticky; top:0;
+          background:var(--card); z-index:2; }
+  aside header b { font-size:14px; } aside header small { display:block; color:var(--mut); font-size:12px; }
+  .grp { padding:12px 16px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--mut); }
+  .ep { padding:6px 16px; font-size:13px; color:var(--ink); border:0; background:none; width:100%;
+          text-align:left; display:block; }
+  .ep:hover { background:var(--bg); } .ep.active { background:var(--accent); color:#fff; }
+  details > summary { padding:12px 16px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+          color:var(--mut); cursor:pointer; list-style:none; } details > summary::-webkit-details-marker{display:none;}
+  details > summary::before { content:"▸ "; } details[open] > summary::before { content:"▾ "; }
+
+  main { overflow:auto; padding:20px 24px; }
+  .bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .bar code { background:var(--card); border:1px solid var(--line); padding:3px 8px; border-radius:6px; }
+  .pill { font-size:12px; padding:2px 8px; border-radius:20px; background:var(--card); border:1px solid var(--line); }
+  .pill.ok { background:rgba(26,157,84,.15); color:var(--ok); border-color:transparent; }
+  .pill.err { background:rgba(221,51,51,.15); color:var(--err); border-color:transparent; }
+  #logout { margin-left:auto; border:1px solid var(--line); background:var(--card); color:var(--ink);
+          border-radius:7px; padding:6px 12px; }
+
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:4px 0 20px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .tile .n { font-size:26px; font-weight:700; } .tile .l { font-size:12px; color:var(--mut); }
+  .progress { height:26px; border-radius:7px; background:var(--line); overflow:hidden; position:relative; }
+  .progress > span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+          font-size:12px; font-weight:600; }
+  .progress > i { display:block; height:100%; background:var(--ok); }
+  h2 { font-size:15px; margin:22px 0 10px; }
+
+  .mini { width:120px; height:14px; border-radius:7px; background:var(--line); overflow:hidden; display:inline-block; vertical-align:middle; }
+  .mini > i { display:block; height:100%; background:var(--accent); }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th,td { border:1px solid var(--line); padding:5px 9px; text-align:left; vertical-align:top; white-space:nowrap; }
+  th { background:var(--card); position:sticky; top:0; }
+  td.nested { white-space:pre-wrap; max-width:380px; font-family:ui-monospace,monospace; font-size:12px; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px;
+          overflow:auto; max-height:72vh; font-size:12.5px; }
+  .hint { color:var(--mut); }
+  .tablewrap { overflow:auto; max-height:76vh; border:1px solid var(--line); border-radius:8px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ok); margin-right:6px; }
+</style>
+</head>
+<body>
+
+<form id="login">
+  <h1>NGEN Explorer</h1>
+  <p>RGIS staff login — event E-number, connection code, badge ID.</p>
+  <label>Authorization Code</label><input id="eventId" autocomplete="off" required>
+  <label>Connection Code</label><input id="eventCode" autocomplete="off" required>
+  <label>Badge ID</label><input id="badgeId" autocomplete="off" required>
+  <button type="submit">Log in</button>
+  <div id="loginErr"></div>
+</form>
+
+<div id="app">
+  <aside>
+    <header><b id="whoStore">—</b><small id="whoEvent"></small></header>
+    <nav id="nav"></nav>
+  </aside>
+  <main>
+    <div class="bar">
+      <code id="curPath">Overview</code><span id="status"></span>
+      <button id="logout">Log out</button>
+    </div>
+    <div id="out"></div>
+  </main>
+</div>
+
+<script>
+// group -> endpoints (param-free GETs). Order here is nav order.
+const NAV = {
+  "Progress / Areas": ["statistic/flowleader","statistic/range","statistic/countedArea","statistic/notCountedArea",
+    "statistic/verifiedArea","statistic/notVerifiedArea","statistic/duplicateArea","statistic/voidedArea",
+    "dashboard/rangesWithVerificationStats","areaRangesBar","areaTreeRanges"],
+  "People": ["tca/summary","statistic/teamMember","statistic/teamMemberPerformance","statistic/handheld","statistic/ring-scanners"],
+  "Event / Info": ["version","database/version","eventInfo","headerInfo","inventoryProperties","miscellaneous",
+    "central/event/status","metadata"],
+  "Count": ["locationsList","notDeletedlocationsList","exceptionReasons","reasonCodeList","precountSummary",
+    "precountFromJobInfo","recreateStatisticsStatus"],
+  "Verify / RMV": ["rmv/queue","rmv/queue/filtersList","rmv/itemizedReasonCodeFilters","rmv/viewerAutoApprovalStatus",
+    "variances/departments","variances/items","variances/maintenance"],
+  "Finish": ["finalReport/checks","finalReport/verifyChecks","finalReport/reports","finalReport/outputs",
+    "closeout/eventStatus","closeout/jobStatus","closeout/reports","closeout/outputs","checkCloseout",
+    "customerEvaluation/piqa","rgisEvaluation","adjustmentsSummary","interimReportsList"],
+  "TCA": ["tca/eventinfo","tca/adder","tca/details/check","tca/usermanager/roles","tca/usermanager/nextBadgeId"],
+};
+// collapsed-by-default bucket
+const OTHERS = {
+  "Walmart": ["walmart/ranges","walmart/precount/items/status","walmart/settings/lockoutDuration"],
+  "CNH": ["cnh/booker/","cnh/booker/rcaReasonCodes","cnh/booker/wipLaneDropDownValues","cnh/family/metadata","cnh/releaseParts/classprogress"],
+  "Device / USB": ["USBCollector","usbCollector/files","usbCollector/files/status","usbCollector/files/lastResult","deviceDownload/limitOfDownloads"],
+  "Scripts": ["eventScripts/status","eventScripts/aphTarget/status"],
+  "Prepare": ["prepare/barcode","prepare/datamatrix","prepareTab/extra/handheld/status","handheld/databaseInfo","notHandheldFilesCount"],
+};
+
+let TOKEN = null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
+const pct = v => { if (v==null) return null; const m=String(v).match(/-?\d+(\.\d+)?/); return m?Math.max(0,Math.min(100,+m[0])):null; };
+
+$("#login").addEventListener("submit", async e => {
+  e.preventDefault(); $("#loginErr").textContent = "";
+  const body = { eventId:$("#eventId").value.trim(), eventCode:$("#eventCode").value.trim(),
+    badgeId:$("#badgeId").value.trim(), customer:false, source:"webui" };
+  try {
+    const r = await fetch("/api/login", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { $("#loginErr").textContent = d.errorMessage || (d.errorMessages||[]).join(", ") || "Login failed"; return; }
+    TOKEN = d.token; startApp(d);
+  } catch (err) { $("#loginErr").textContent = "Network error: " + err.message; }
+});
+
+async function startApp(login) {
+  $("#login").style.display = "none"; $("#app").style.display = "grid";
+  try { const h = await api("headerInfo");
+    $("#whoStore").textContent = h.customerName ? `${h.customerName} · store ${h.storeNumber}` : login.authNumber;
+  } catch { $("#whoStore").textContent = login.authNumber; }
+  $("#whoEvent").textContent = `${login.authNumber} · token exp ${new Date(login.expirationDateTime).toLocaleTimeString()}`;
+  buildNav(); showOverview();
+}
+
+function epButton(p) {
+  const b = document.createElement("button"); b.className = "ep"; b.textContent = p || "(root)";
+  b.onclick = () => { document.querySelectorAll(".ep").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); load(p); };
+  return b;
+}
+function buildNav() {
+  const nav = $("#nav"); nav.innerHTML = "";
+  const ov = epButton(""); ov.textContent = "★ Overview"; ov.classList.add("active");
+  ov.onclick = () => { document.querySelectorAll(".ep").forEach(x=>x.classList.remove("active")); ov.classList.add("active"); showOverview(); };
+  nav.appendChild(ov);
+  for (const [g, eps] of Object.entries(NAV)) {
+    const h = document.createElement("div"); h.className="grp"; h.textContent=g; nav.appendChild(h);
+    eps.forEach(p => nav.appendChild(epButton(p)));
+  }
+  const det = document.createElement("details"); // collapsed Others
+  det.innerHTML = "<summary>Others</summary>";
+  for (const [g, eps] of Object.entries(OTHERS)) {
+    const h = document.createElement("div"); h.className="grp"; h.textContent=g; det.appendChild(h);
+    eps.forEach(p => det.appendChild(epButton(p)));
+  }
+  nav.appendChild(det);
+}
+
+function api(path) {
+  return fetch("/api/" + path, { headers:{ Authorization:"Bearer " + TOKEN } }).then(async r => {
+    const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
+    if (!r.ok) throw { status:r.status, body:j }; return j; });
+}
+
+// curated dashboard
+async function showOverview() {
+  $("#curPath").textContent = "Overview";
+  $("#status").innerHTML = '<span class="pill">loading…</span>';
+  $("#out").innerHTML = "";
+  try {
+    const [fl, tm, tca] = await Promise.all([
+      api("statistic/flowleader").catch(()=>null),
+      api("statistic/teamMember").catch(()=>null),
+      api("tca/summary").catch(()=>null),
+    ]);
+    $("#status").innerHTML = '<span class="pill ok">live</span>';
+    let html = "";
+    const f = fl && fl.viewTableRowsCollection && fl.viewTableRowsCollection[0];
+    if (f) {
+      const p = pct(f.Progress) ?? 0;
+      html += `<div class="progress"><i style="width:${p}%"></i><span>Event ${f.Progress} complete</span></div>`;
+      html += `<div class="tiles">
+        ${tile(f.Counted, "Areas counted")} ${tile(f.NotCounted, "Areas remaining")}
+        ${tile(f.AreaTotal, "Areas total")} ${tile(f.NOF, "NOF occurrences")}
+        ${tile(f.PPH, "Pieces / hour")} ${tile(f.VerificationByRGIS, "Verified (RGIS)")}</div>`;
+    }
+    if (tca) html += `<div class="tiles">
+      ${tile(tca.tcaActiveEmployeesCount, "On the clock now")} ${tile(tca.teamMembersCount, "Team members")}
+      ${tile(tca.tcaTotalHoursCount, "Total store hours")}</div>`;
+    if (tm && tm.viewTableRowsCollection) {
+      html += "<h2>People working — live counts</h2>" + tableHTML(tm.viewTableRowsCollection);
+    }
+    $("#out").innerHTML = html || "<p class='hint'>No overview data.</p>";
+  } catch (e) {
+    $("#status").innerHTML = `<span class="pill err">${e.status||"ERR"}</span>`;
+    $("#out").innerHTML = "<pre>" + esc(JSON.stringify(e.body ?? e, null, 2)) + "</pre>";
+  }
+}
+const tile = (n, l) => `<div class="tile"><div class="n">${n==null?"—":esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+
+async function load(path) {
+  $("#curPath").textContent = "api/" + path;
+  $("#status").innerHTML = '<span class="pill">loading…</span>'; $("#out").innerHTML = "";
+  try {
+    const data = await api(path);
+    $("#status").innerHTML = '<span class="pill ok">200 OK</span>'; render(data);
+  } catch (e) {
+    $("#status").innerHTML = `<span class="pill err">${e.status||"ERR"}</span>`;
+    $("#out").innerHTML = "<pre>" + esc(JSON.stringify(e.body ?? e, null, 2)) + "</pre>";
+  }
+}
+
+// unwrap the common array containers NGEN uses, else first object-array, else raw
+function findRows(data) {
+  if (Array.isArray(data)) return [data, ""];
+  if (data && typeof data === "object") {
+    for (const k of ["viewTableRowsCollection","tcaSummary","collection","areaRangesTree","employeeNamesList","data","checkItems","reasonCodeList"])
+      if (Array.isArray(data[k])) return [data[k], k];
+    if (data.dashboardItems && Array.isArray(data.dashboardItems.ranges)) return [data.dashboardItems.ranges, "ranges"];
+    for (const k of Object.keys(data))
+      if (Array.isArray(data[k]) && data[k].length && typeof data[k][0]==="object") return [data[k], k];
+  }
+  return [null, ""];
+}
+function render(data) {
+  const [rows, label] = findRows(data);
+  if (rows && rows.length && typeof rows[0]==="object") {
+    $("#out").innerHTML = (label?`<p class="hint">${rows.length} rows · <code>${esc(label)}</code></p>`:`<p class="hint">${rows.length} rows</p>`) + tableHTML(rows);
+  } else $("#out").innerHTML = "<pre>" + esc(JSON.stringify(data, null, 2)) + "</pre>";
+}
+function tableHTML(rows) {
+  const cols = [...new Set(rows.flatMap(r => Object.keys(r)))];
+  let h = '<div class="tablewrap"><table><thead><tr>' + cols.map(c=>"<th>"+esc(c)+"</th>").join("") + "</tr></thead><tbody>";
+  for (const r of rows) {
+    h += "<tr>" + cols.map(c => {
+      let v = r[c];
+      if (/progress/i.test(c)) { const p = pct(v); if (p!=null) return `<td><span class="mini"><i style="width:${p}%"></i></span> ${esc(v)}</td>`; }
+      if (v && typeof v==="object") return '<td class="nested">'+esc(JSON.stringify(v))+"</td>";
+      return "<td>"+esc(v==null?"":String(v))+"</td>";
+    }).join("") + "</tr>";
+  }
+  return h + "</tbody></table></div>";
+}
+$("#logout").onclick = () => location.reload();
+</script>
+</body>
+</html>
