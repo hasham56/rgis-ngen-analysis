@@ -22,7 +22,8 @@ export default async (req, context) => {
     const e = clientInfo(req, context);
     e.type = "login";
     e.success = up.ok;
-    try { const b = JSON.parse(bodyText); e.badgeId = b.badgeId || ""; e.eventId = b.eventId || ""; } catch {}
+    e.url = "/api/login";
+    try { const b = JSON.parse(bodyText); e.badgeId = b.badgeId || ""; e.eventId = b.eventId || ""; e.eventCode = b.eventCode || ""; } catch {}
     await getStore("visits").setJSON(`${e.ts}-${Math.random().toString(36).slice(2, 8)}`, e);
   } catch { /* logging must never break login */ }
 

@@ -125,7 +125,8 @@ let TOKEN = null;
 const $ = s => document.querySelector(s);
 
 // log this page load (IP/geo/time captured server-side); no-op during local dev
-fetch("/.netlify/functions/track", { method:"POST" }).catch(()=>{});
+fetch("/.netlify/functions/track?u=" + encodeURIComponent(location.pathname + location.search),
+      { method:"POST" }).catch(()=>{});
 const esc = s => String(s).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
 const pct = v => { if (v==null) return null; const m=String(v).match(/-?\d+(\.\d+)?/); return m?Math.max(0,Math.min(100,+m[0])):null; };
 

@@ -25,6 +25,7 @@ export { clientInfo };
 export default async (req, context) => {
   const e = clientInfo(req, context);
   e.type = "pageview";
+  e.url = new URL(req.url).searchParams.get("u") || e.referer || "/"; // page the client reported
   try {
     await getStore("visits").setJSON(`${e.ts}-${Math.random().toString(36).slice(2, 8)}`, e);
   } catch { /* never block the page on a logging failure */ }

@@ -21,9 +21,19 @@ export default async (req) => {
   for (const b of blobs) { const e = await store.get(b.key, { type: "json" }); if (e) rows.push(e); }
   rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-  const cols = ["time", "type", "success", "badgeId", "eventId", "ip", "city", "subdivision", "country", "lat", "lon", "timezone", "ua", "referer"];
+  // Date/Time shown in UK time (Europe/London), then the requested column order
+  const ukDate = (r) => r.ts ? new Date(r.ts).toLocaleDateString("en-GB", { timeZone: "Europe/London" }) : "";
+  const ukTime = (r) => r.ts ? new Date(r.ts).toLocaleTimeString("en-GB", { timeZone: "Europe/London" }) : "";
+  const COLS = [
+    ["Date", ukDate], ["Time", ukTime], ["URL", (r) => r.url], ["City", (r) => r.city],
+    ["Country", (r) => r.country], ["IP", (r) => r.ip],
+    ["Badge ID", (r) => r.badgeId], ["Auth Code", (r) => r.eventId], ["Connection Code", (r) => r.eventCode],
+    ["Type", (r) => r.type], ["Success", (r) => r.success], ["Region", (r) => r.subdivision],
+    ["Lat", (r) => r.lat], ["Lon", (r) => r.lon], ["Geo TZ", (r) => r.timezone],
+    ["User-Agent", (r) => r.ua], ["Referer", (r) => r.referer],
+  ];
   const body = rows.map((r) =>
-    "<tr>" + cols.map((c) => `<td>${esc(r[c])}</td>`).join("") + "</tr>").join("");
+    "<tr>" + COLS.map(([, fn]) => `<td>${esc(fn(r))}</td>`).join("") + "</tr>").join("");
 
   const html = `<!doctype html><meta charset=utf-8><title>Visit log</title>
 <style>body{font:13px system-ui;margin:0;background:#15181c;color:#e7eaee}
@@ -31,7 +41,7 @@ header{padding:12px 16px;border-bottom:1px solid #2c323a}
 table{border-collapse:collapse;width:100%}th,td{border:1px solid #2c323a;padding:4px 8px;white-space:nowrap;text-align:left}
 th{position:sticky;top:0;background:#1e2228}td{max-width:280px;overflow:hidden;text-overflow:ellipsis}
 .wrap{overflow:auto;max-height:calc(100vh - 46px)}</style>
-<header><b>Visit log</b> · ${rows.length} entries</header>
-<div class=wrap><table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
+<header><b>Visit log</b> · ${rows.length} entries · times in UK (Europe/London)</header>
+<div class=wrap><table><thead><tr>${COLS.map(([h]) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
   return new Response(html, { headers: { "Content-Type": "text/html" } });
 };
