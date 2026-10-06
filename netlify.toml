@@ -1,10 +1,26 @@
-# Netlify serves index.html statically and proxies /api/* to the NGEN backend
-# server-side, so the browser only ever talks to its own origin (no CORS).
+# Netlify serves index.html statically; functions handle login-logging + the
+# log viewer; everything else under /api proxies straight to NGEN server-side
+# (so the browser stays same-origin and CORS never fires).
 [build]
   publish = "."
+  functions = "netlify/functions"
 
+# log-aware login proxy — MUST come before the /api/* catch-all
+[[redirects]]
+  from = "/api/login"
+  to = "/.netlify/functions/login"
+  status = 200
+  force = true
+
+# password-gated visit log
+[[redirects]]
+  from = "/logs"
+  to = "/.netlify/functions/logs"
+  status = 200
+
+# all other API calls proxy to NGEN unchanged
 [[redirects]]
   from = "/api/*"
   to = "https://api-ngen-eu17.rgiseu.com/api/:splat"
-  status = 200          # 200 = rewrite/proxy (not a 3xx redirect the browser follows)
+  status = 200
   force = true
