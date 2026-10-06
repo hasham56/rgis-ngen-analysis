@@ -5,7 +5,7 @@
   publish = "."
   functions = "netlify/functions"
 
-# log-aware login proxy — MUST come before the /api/* catch-all
+# log-aware login proxy, MUST come before the /api/* catch-all
 [[redirects]]
   from = "/api/login"
   to = "/.netlify/functions/login"

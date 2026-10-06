@@ -45,6 +45,9 @@
   .pill.err { background:rgba(221,51,51,.15); color:var(--err); border-color:transparent; }
   #logout { margin-left:auto; border:1px solid var(--line); background:var(--card); color:var(--ink);
           border-radius:7px; padding:6px 12px; }
+  #ovRefresh { border:1px solid var(--line); background:var(--card); color:var(--ink);
+          border-radius:7px; padding:6px 12px; }
+  #ovRefresh:disabled { opacity:.55; cursor:default; }
 
   .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:4px 0 20px; }
   .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
@@ -72,7 +75,7 @@
 
 <form id="login">
   <h1>NGEN Explorer</h1>
-  <p>RGIS staff login — event E-number, connection code, badge ID.</p>
+  <p>RGIS staff login: event E-number, connection code, badge ID.</p>
   <label>Authorization Code</label><input id="eventId" autocomplete="off" required>
   <label>Connection Code</label><input id="eventCode" autocomplete="off" required>
   <label>Badge ID</label><input id="badgeId" autocomplete="off" required>
@@ -82,7 +85,7 @@
 
 <div id="app">
   <aside>
-    <header><b id="whoStore">—</b><small id="whoEvent"></small></header>
+    <header><b id="whoStore">-</b><small id="whoEvent"></small></header>
     <nav id="nav"></nav>
   </aside>
   <main>
@@ -123,6 +126,10 @@ const OTHERS = {
 
 let TOKEN = null;
 const $ = s => document.querySelector(s);
+const SKEY = "ngen";
+let lastRefresh = 0, refreshTimer;
+const saveSession = d => { try { sessionStorage.setItem(SKEY, JSON.stringify(
+  { token:d.token, authNumber:d.authNumber, expirationDateTime:d.expirationDateTime })); } catch {} };
 
 // log this page load (IP/geo/time captured server-side); no-op during local dev
 fetch("/.netlify/functions/track?u=" + encodeURIComponent(location.pathname + location.search),
@@ -138,7 +145,7 @@ $("#login").addEventListener("submit", async e => {
     const r = await fetch("/api/login", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
     const d = await r.json();
     if (!r.ok) { $("#loginErr").textContent = d.errorMessage || (d.errorMessages||[]).join(", ") || "Login failed"; return; }
-    TOKEN = d.token; startApp(d);
+    TOKEN = d.token; saveSession(d); startApp(d);
   } catch (err) { $("#loginErr").textContent = "Network error: " + err.message; }
 });
 
@@ -178,6 +185,7 @@ function buildNav() {
 function api(path) {
   return fetch("/api/" + path, { headers:{ Authorization:"Bearer " + TOKEN } }).then(async r => {
     const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
+    if (r.status === 401) { try { sessionStorage.removeItem(SKEY); } catch {} }
     if (!r.ok) throw { status:r.status, body:j }; return j; });
 }
 
@@ -207,15 +215,18 @@ async function showOverview() {
       ${tile(tca.tcaActiveEmployeesCount, "On the clock now")} ${tile(tca.teamMembersCount, "Team members")}
       ${tile(tca.tcaTotalHoursCount, "Total store hours")}</div>`;
     if (tm && tm.viewTableRowsCollection) {
-      html += "<h2>People working — live counts</h2>" + tableHTML(tm.viewTableRowsCollection);
+      html += "<h2>People working: live counts</h2>" + tableHTML(tm.viewTableRowsCollection);
     }
-    $("#out").innerHTML = html || "<p class='hint'>No overview data.</p>";
+    const head = `<div class="bar" style="margin-bottom:12px"><button id="ovRefresh">⟳ Refresh</button>`
+      + `<span class="hint">updated ${new Date().toLocaleTimeString("en-GB",{timeZone:"Europe/London"})} UK</span></div>`;
+    $("#out").innerHTML = head + (html || "<p class='hint'>No overview data.</p>");
+    wireRefresh();
   } catch (e) {
     $("#status").innerHTML = `<span class="pill err">${e.status||"ERR"}</span>`;
     $("#out").innerHTML = "<pre>" + esc(JSON.stringify(e.body ?? e, null, 2)) + "</pre>";
   }
 }
-const tile = (n, l) => `<div class="tile"><div class="n">${n==null?"—":esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+const tile = (n, l) => `<div class="tile"><div class="n">${n==null?"-":esc(n)}</div><div class="l">${esc(l)}</div></div>`;
 
 async function load(path) {
   $("#curPath").textContent = "api/" + path;
@@ -260,7 +271,29 @@ function tableHTML(rows) {
   }
   return h + "</tbody></table></div>";
 }
-$("#logout").onclick = () => location.reload();
+$("#logout").onclick = () => { try { sessionStorage.removeItem(SKEY); } catch {} location.reload(); };
+
+// cooldown-gated refresh on the Overview
+function wireRefresh() {
+  const b = document.getElementById("ovRefresh");
+  if (!b) return;
+  clearInterval(refreshTimer);
+  const tick = () => {
+    const rem = Math.ceil((30000 - (Date.now() - lastRefresh)) / 1000);
+    if (rem > 0) { b.disabled = true; b.textContent = `⟳ Refresh (${rem}s)`; }
+    else { b.disabled = false; b.textContent = "⟳ Refresh"; clearInterval(refreshTimer); }
+  };
+  b.onclick = () => { if (Date.now() - lastRefresh < 30000) return; lastRefresh = Date.now(); showOverview(); };
+  refreshTimer = setInterval(tick, 1000); tick();
+}
+
+// auto-resume a saved session on refresh (token kept in sessionStorage until it expires)
+try {
+  const s = JSON.parse(sessionStorage.getItem(SKEY) || "null");
+  if (s && s.token && s.expirationDateTime && new Date(s.expirationDateTime) > new Date()) {
+    TOKEN = s.token; startApp(s);
+  } else if (s) { sessionStorage.removeItem(SKEY); }
+} catch {}
 </script>
 </body>
 </html>

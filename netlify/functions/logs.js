@@ -14,7 +14,7 @@ export default async (req) => {
     return new Response('<form style="font:16px system-ui;margin:12vh auto;max-width:300px"><p>Enter password</p><input name="pw" type="password" autofocus style="width:100%;padding:8px"><button style="margin-top:8px;padding:8px 14px">View logs</button></form>',
       { status: pw ? 401 : 200, headers: { "Content-Type": "text/html" } });
 
-  // ponytail: one get per entry — fine at low volume, add paging if the log grows large
+  // ponytail: one get per entry, fine at low volume, add paging if the log grows large
   const store = getStore("visits");
   const { blobs } = await store.list();
   const rows = [];
