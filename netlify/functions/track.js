@@ -28,5 +28,6 @@ export default async (req, context) => {
   try {
     await getStore("visits").setJSON(`${e.ts}-${Math.random().toString(36).slice(2, 8)}`, e);
   } catch { /* never block the page on a logging failure */ }
-  return new Response("", { status: 204 });
+  return new Response("ok", { status: 200 }); // 204 is rejected by the functions runtime
+
 };
