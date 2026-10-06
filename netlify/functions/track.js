@@ -28,7 +28,11 @@ export default async (req, context) => {
   e.url = new URL(req.url).searchParams.get("u") || e.referer || "/"; // page the client reported
   try {
     await getStore("visits").setJSON(`${e.ts}-${Math.random().toString(36).slice(2, 8)}`, e);
-  } catch { /* never block the page on a logging failure */ }
+  } catch (err) {
+    // surface the real reason (visible only when ?debug=1) instead of silently swallowing
+    if (new URL(req.url).searchParams.get("debug") === "1")
+      return new Response("log-error: " + (err && err.message), { status: 200 });
+  }
   return new Response("ok", { status: 200 }); // 204 is rejected by the functions runtime
 
 };
